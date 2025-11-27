@@ -24,7 +24,7 @@ This repository stores short operational notes related to file and folder manage
 
 ## Current facing problems ( non blockers )
 
-### Dirty delete
+### Dirty delete `issue fixed ✅`
 
 - **Issue**: When folder deletion fails partway through (due to network issues, crashes, etc.), the filesystem and database can become out of sync
 - **Impact**: Orphaned records in database or orphaned files/folders on disk
