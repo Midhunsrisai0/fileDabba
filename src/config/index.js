@@ -4,7 +4,8 @@ dotenv.config();
 const config = {
   version: "1.0.0",
   PORT: process.env.PORT || 3000,
-  host: process.env.HOST || "localhost",
+  HOST: process.env.HOST || "localhost",
+  BASE_FILE_PATH: process.env.BASE_FILE_PATH,
 };
 
 module.exports = config;
