@@ -39,6 +39,7 @@ This repository stores short operational notes related to file and folder manage
 ## TODOS
 
 - Need to implement a function that when invoked, gets all files from database and deletes the files in the filesystem that are not in the database to ensure sync
+- Learn more about cloudfare secure tunnel
 
 ## Usage
 
