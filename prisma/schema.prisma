@@ -32,9 +32,8 @@ model Folder {
   name      String
   parentId  Int?
   userId    Int?
-
   // Self-referential relation (Tree)
-  parent    Folder?   @relation("FolderToSubfolders", fields: [parentId], references: [id])
+  parent    Folder?   @relation("FolderToSubfolders", fields: [parentId], references: [id], onDelete: Cascade)
   children  Folder[]  @relation("FolderToSubfolders")
 
   // User who owns this folder
@@ -57,11 +56,10 @@ model File {
   extension    String
   mimeType     String
   size         Int
-
   folderId     Int
   userId       Int?
 
-  folder       Folder    @relation(fields: [folderId], references: [id])
+  folder       Folder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
   user         User?     @relation(fields: [userId], references: [id])
 
   createdAt    DateTime  @default(now())
