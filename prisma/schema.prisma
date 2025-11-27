@@ -14,7 +14,7 @@ generator client {
 //  User (for BetterAuth)
 // ------------------------------------------
 model User {
-  id        String   @id @default(uuid())
+  id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
   createdAt DateTime @default(now())
@@ -28,10 +28,10 @@ model User {
 //  Folder Tree Structure
 // ------------------------------------------
 model Folder {
-  id        String    @id @default(uuid())
+  id        Int       @id @default(autoincrement())
   name      String
-  parentId  String?
-  userId    String?
+  parentId  Int?
+  userId    Int?
 
   // Self-referential relation (Tree)
   parent    Folder?   @relation("FolderToSubfolders", fields: [parentId], references: [id])
@@ -51,15 +51,15 @@ model Folder {
 //  Files
 // ------------------------------------------
 model File {
-  id           String    @id @default(uuid())
+  id           Int       @id @default(autoincrement())
   originalName String
   internalName String     // UUID + extension
   extension    String
   mimeType     String
   size         Int
 
-  folderId     String
-  userId       String?
+  folderId     Int
+  userId       Int?
 
   folder       Folder    @relation(fields: [folderId], references: [id])
   user         User?     @relation(fields: [userId], references: [id])
