@@ -12,6 +12,16 @@ const buildFolderPath = async ({ parentFolderId }) => {
       });
       console.log("Current folder:", folder);
       if (!folder) break;
+      if (folder.id in segments) {
+        console.error(
+          "Detected circular reference in folder hierarchy at folder ID:",
+          folder.id
+        );
+        return {
+          code: 444,
+          message: `Error in building folder path: Folder corrupted.`,
+        };
+      }
       segments.unshift(folder.name);
       currentFolderID = folder.parentId;
     }
