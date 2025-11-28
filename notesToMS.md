@@ -38,8 +38,9 @@ This repository stores short operational notes related to file and folder manage
 
 ## TODOS
 
-- Need to implement a function that when invoked, gets all files from database and deletes the files in the filesystem that are not in the database to ensure sync
+- Cron to ensure file structure is in sync with db
 - Learn more about cloudfare secure tunnel
+- Redis locking to solve concurrency issues
 
 ## Usage
 

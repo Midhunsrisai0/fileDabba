@@ -148,16 +148,16 @@ const deleteFolder = async (req, res) => {
         });
         console.log(`Backup created at: ${backupPath}`);
 
-        // Step 2: Delete directory from filesystem
-        fs.rmSync(folderPath, { recursive: true, force: true });
-        console.log(`Folder deleted from filesystem: ${folderPath}`);
-
         // Step 3: Delete database record only if filesystem deletion succeeded
         const deleteResult = await deleteFolderRecursive({ folderId });
         if (deleteResult.code != 200) {
           throw new Error(deleteResult.message);
         }
         console.log(`Database record deleted for folder ID: ${folderId}`);
+
+        // Step 2: Delete directory from filesystem
+        fs.rmSync(folderPath, { recursive: true, force: true });
+        console.log(`Folder deleted from filesystem: ${folderPath}`);
 
         // step 4: delete backup after successful deletion
         fs.rmSync(backupPath, { recursive: true, force: true });

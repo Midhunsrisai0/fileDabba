@@ -2,7 +2,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const config = {
-  version: "1.0.0",
+  version: "2.0.0",
   PORT: process.env.PORT || 3000,
   HOST: process.env.HOST || "localhost",
   BASE_FILE_PATH: process.env.BASE_FILE_PATH,
