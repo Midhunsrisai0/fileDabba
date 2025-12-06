@@ -12,7 +12,7 @@ const buildFolderPath = async ({ parentFolderId }) => {
       });
 
       if (!folder) break;
-      if (folder.id in segments) {
+      if (segments.includes(folder.name)) {
         console.error(
           "Detected circular reference in folder hierarchy at folder ID:",
           folder.id

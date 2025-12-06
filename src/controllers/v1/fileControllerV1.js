@@ -132,7 +132,7 @@ const deleteFolder = async (req, res) => {
       return res.status(404).json({ code: 404, message: "Folder not found" });
     }
     const folderPathResp = await buildFolderPath({ parentFolderId: folderId });
-    if (folderPathResp.code != 200) {
+    if (folderPathResp.code !== 200) {
       return res.status(folderPathResp.code).json({
         code: folderPathResp.code,
         message: `Deleting folder failed: ${folderPathResp.message}`,
@@ -159,6 +159,9 @@ const deleteFolder = async (req, res) => {
         `folder_${folderId}_backup_${Date.now()}`
       );
       try {
+        if (!fs.existsSync(folderPath)) {
+          throw new Error(`Folder to backup does not exist: ${folderPath}`);
+        }
         fs.cpSync(folderPath, backupPath, {
           recursive: true, // Copy all subfolders and files
           force: true,
@@ -167,7 +170,7 @@ const deleteFolder = async (req, res) => {
 
         // Step 3: Delete database record only if filesystem deletion succeeded
         const deleteResult = await deleteFolderRecursive({ folderId });
-        if (deleteResult.code != 200) {
+        if (deleteResult.code !== 200) {
           throw new Error(deleteResult.message);
         }
         console.log(`Database record deleted for folder ID: ${folderId}`);
@@ -211,7 +214,7 @@ const uploadController = async (req, res) => {
     //check if single or multiple files
     const files = req.files;
     if (!files || files.length === 0) {
-      return res.status(400).json({ code: 401, message: "No files uploaded" });
+      return res.status(401).json({ code: 401, message: "No files uploaded" });
     }
 
     const parentFolderId = req.parentFolderId;
@@ -463,15 +466,15 @@ const deleteFileController = async (req, res) => {
         `file_${fileId}_backup_${Date.now()}`
       );
       try {
+        if (!fs.existsSync(filePath)) {
+          throw new Error(`File to backup does not exist: ${filePath}`);
+        }
         fs.copyFileSync(filePath, backupPath);
         console.log(`File backup created at: ${backupPath}`);
 
         const deleteResult = await prisma.file.delete({
           where: { id: fileId },
         });
-        if (!deleteResult) {
-          throw new Error(deleteResult.message);
-        }
 
         if (fs.existsSync(thumbnailPath)) {
           fs.unlinkSync(thumbnailPath);
