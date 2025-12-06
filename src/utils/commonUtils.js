@@ -5,14 +5,16 @@ const buildFolderPath = async ({ parentFolderId }) => {
   try {
     const segments = [];
     let currentFolderID = parentFolderId;
+    const visitedFolderIds = new Set();
+
     while (currentFolderID) {
       console.log("Building path, currentFolderID:", currentFolderID);
       const folder = await prisma.folder.findUnique({
         where: { id: currentFolderID },
       });
-      console.log("Current folder:", folder);
+
       if (!folder) break;
-      if (folder.id in segments) {
+      if (visitedFolderIds.has(folder.id)) {
         console.error(
           "Detected circular reference in folder hierarchy at folder ID:",
           folder.id
@@ -24,6 +26,7 @@ const buildFolderPath = async ({ parentFolderId }) => {
       }
       segments.unshift(folder.name);
       currentFolderID = folder.parentId;
+      visitedFolderIds.add(folder.id);
     }
 
     const resolvedPath = path.resolve(...segments);
