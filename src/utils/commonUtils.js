@@ -10,7 +10,7 @@ const buildFolderPath = async ({ parentFolderId }) => {
       const folder = await prisma.folder.findUnique({
         where: { id: currentFolderID },
       });
-      console.log("Current folder:", folder);
+
       if (!folder) break;
       if (folder.id in segments) {
         console.error(

@@ -1,6 +1,8 @@
 const config = require("../../config");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const sharp = require("sharp");
 const { prisma } = require("../../../prisma/prisma");
 const {
   buildFolderPath,
@@ -11,21 +13,29 @@ const createFolder = async (req, res) => {
   try {
     const body = req.body;
     const folderName = body.folderName;
-    const parentFolderId = body.parentFolderId;
+    const parentFolderId = req.parentFolderId;
+    const parentFolder = req.parentFolder;
 
-    const parentFullPathResp = await buildFolderPath({
-      parentFolderId: parentFolderId,
-    });
-
-    if (parentFullPathResp.code != 200) {
-      return res.status(parentFullPathResp.code).json({
-        code: parentFullPathResp.code,
-        message: `Creating folder failed: ${parentFullPathResp.message}`,
+    if (!Number.isInteger(parentFolderId) || !parentFolder) {
+      return res.status(400).json({
+        code: 400,
+        message: "Parent folder context missing for folder creation",
       });
     }
 
-    const fullFolderCreatepath = parentFullPathResp?.data;
-    const newFolderPath = path.join(fullFolderCreatepath, folderName);
+    const parentFolderPathResp = await buildFolderPath({
+      parentFolderId,
+    });
+
+    if (parentFolderPathResp.code !== 200) {
+      return res.status(parentFolderPathResp.code).json({
+        code: parentFolderPathResp.code,
+        message: `Creating folder failed: ${parentFolderPathResp.message}`,
+      });
+    }
+
+    const parentFolderPath = parentFolderPathResp.data;
+    const newFolderPath = path.join(parentFolderPath, folderName);
 
     // Return immediate response to user
     res.status(202).json({
@@ -101,9 +111,16 @@ const createFolder = async (req, res) => {
 
 const deleteFolder = async (req, res) => {
   try {
-    const folderId = parseInt(req.query.folderId);
+    const folderIdRaw = req.query.folderId;
+    const folderId = Number.parseInt(folderIdRaw, 10);
 
-    if (folderId == config.BASE_FOLDER_ID) {
+    if (Number.isNaN(folderId)) {
+      return res
+        .status(400)
+        .json({ code: 400, message: "Invalid folder identifier" });
+    }
+
+    if (folderId === Number(config.BASE_FOLDER_ID)) {
       return res
         .status(400)
         .json({ code: 400, message: "Root folder cannot be deleted" });
@@ -136,12 +153,12 @@ const deleteFolder = async (req, res) => {
 
     // Background processing (fire-and-forget)
     setImmediate(async () => {
+      // Step 1: Save data to backup cache
+      const backupPath = path.join(
+        config.BACKUP_PATH,
+        `folder_${folderId}_backup_${Date.now()}`
+      );
       try {
-        // Step 1: Save data to backup cache
-        const backupPath = path.join(
-          config.BACKUP_PATH,
-          `folder_${folderId}_backup_${Date.now()}`
-        );
         fs.cpSync(folderPath, backupPath, {
           recursive: true, // Copy all subfolders and files
           force: true,
@@ -189,74 +206,307 @@ const deleteFolder = async (req, res) => {
   }
 };
 
-// const uploadController = (req, res) => {
-//   try {
-//     //check if single or multiple files
-//     const files = req.files;
-//     if (!files || files.length === 0) {
-//       return res.status(400).json({ code: 401, message: "No files uploaded" });
-//     }
+const uploadController = async (req, res) => {
+  try {
+    //check if single or multiple files
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ code: 401, message: "No files uploaded" });
+    }
 
-//     const metadataMap = files.map((file) => ({
-//       filename: file.originalname,
-//       size: file.size,
-//       mimetype: file.mimetype,
-//     }));
-//     return res.json({
-//       code: 200,
-//       message: "File uploaded successfully",
-//       data: metadataMap,
-//     });
-//   } catch (error) {
-//     console.error("Upload error:", error);
-//     return res.status(500).json({
-//       code: 500,
-//       message: `Internal server error: ${error?.message}`,
-//     });
-//   }
-// };
+    const parentFolderId = req.parentFolderId;
+    const parentFolder = req.parentFolder;
 
-// const downloadFileController = (req, res) => {
-//     const filename = req.query.filename;
+    if (!Number.isInteger(parentFolderId) || !parentFolder) {
+      return res.status(400).json({
+        code: 400,
+        message: "Parent folder context missing for upload",
+      });
+    }
 
-//     if (!filename) {
-//         return res.status(400).json({ message: "Filename is required" });
-//   }
+    const targetFolderResp = await buildFolderPath({
+      parentFolderId,
+    });
 
-//   // Resolve absolute path and sanitize filename
-//   const basePath = path.resolve(config.BASE_FILE_PATH);
-//   const sanitizedFilename = path.basename(filename);
-//   const filepath = path.join(basePath, sanitizedFilename);
-//   console.log("Resolved filepath:", filepath);
-//   console.log("Base path:", basePath);
-//   // Security: Prevent path traversal attacks
-//   if (!filepath.startsWith(basePath)) {
-//       return res.status(403).json({ message: "Access denied" });
-//     }
+    if (targetFolderResp.code !== 200) {
+      return res.status(targetFolderResp.code).json({
+        code: targetFolderResp.code,
+        message: `Uploading file failed: ${targetFolderResp.message}`,
+      });
+    }
 
-//   if (!fs.existsSync(filepath)) {
-//     return res.status(404).json({ message: "File not found" });
-//   }
+    const targetFolderPath = targetFolderResp.data;
 
-//   console.log(`Downloading file from path: ${filepath}`);
-//   const readStream = fs.createReadStream(filepath);
+    if (!fs.existsSync(targetFolderPath)) {
+      return res.status(404).json({
+        code: 404,
+        message: "Destination folder does not exist on filesystem",
+      });
+    }
 
-//   // Handle stream errors
-//   readStream.on("error", (err) => {
-//     console.error("Stream error:", err);
-//     return res.status(500).json({ message: "Error reading file" });
-//   });
+    const thumbsDir = path.join(targetFolderPath, ".thumbs");
+    if (!fs.existsSync(thumbsDir)) {
+      await fs.promises.mkdir(thumbsDir, { recursive: true });
+    }
 
-//   res.setHeader(
-//     "Content-Disposition",
-//     `attachment; filename="${sanitizedFilename}"`
-//   );
-//   readStream.pipe(res);
-// };
+    const userId = req.user?.id ?? null;
+    const responseData = files.map((file) => ({
+      originalName: file.originalname,
+      size: file.size,
+      mimeType: file.mimetype,
+      status: "processing",
+    }));
+
+    res.status(202).json({
+      code: 202,
+      message: "File upload initiated",
+      data: responseData,
+    });
+
+    setImmediate(async () => {
+      for (const file of files) {
+        const extension = path.extname(file.originalname) || "";
+        const normalizedExtension = extension.replace(".", "").toLowerCase();
+        const internalName = `${crypto.randomUUID()}${extension}`;
+        const fileDiskPath = path.join(targetFolderPath, internalName);
+        const thumbnailDiskPath = path.join(thumbsDir, internalName);
+        let thumbnailGenerated = false;
+
+        try {
+          await fs.promises.writeFile(fileDiskPath, file.buffer);
+
+          if (file.mimetype && file.mimetype.startsWith("image/")) {
+            await sharp(file.buffer)
+              .resize({ width: 256, height: 256, fit: "inside" })
+              .toFile(thumbnailDiskPath);
+            thumbnailGenerated = true;
+          }
+
+          await prisma.file.create({
+            data: {
+              originalName: file.originalname,
+              internalName,
+              extension: normalizedExtension,
+              mimeType: file.mimetype,
+              size: file.size,
+              folderId: parentFolderId,
+              userId,
+            },
+          });
+
+          console.log(
+            `Uploaded file '${file.originalname}' to '${fileDiskPath}'${
+              thumbnailGenerated ? " with thumbnail." : "."
+            }`
+          );
+        } catch (fileError) {
+          console.error(
+            `Upload processing failed for file '${file.originalname}':`,
+            fileError.message
+          );
+          await fs.promises.rm(fileDiskPath, { force: true }).catch(() => {});
+          if (thumbnailGenerated) {
+            await fs.promises
+              .rm(thumbnailDiskPath, { force: true })
+              .catch(() => {});
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    return res.status(500).json({
+      code: 500,
+      message: `Internal server error: ${error?.message}`,
+    });
+  }
+};
+
+const getFileController = async (req, res) => {
+  try {
+    const fileData = req.fileObject;
+
+    if (!fileData) {
+      return res.status(500).json({
+        code: 500,
+        message: "File context unavailable in request",
+      });
+    }
+
+    const folderPathResp = await buildFolderPath({
+      parentFolderId: fileData.folderId,
+    });
+
+    if (folderPathResp.code !== 200) {
+      return res.status(folderPathResp.code).json({
+        code: folderPathResp.code,
+        message: `Retrieving file failed: ${folderPathResp.message}`,
+      });
+    }
+
+    const folderPath = folderPathResp.data;
+    const filePath = path.join(folderPath, fileData.internalName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found on disk" });
+    }
+
+    const fileStat = fs.statSync(filePath);
+    const fileSize = fileStat.size;
+    const rangeHeader = req.headers.range;
+    const contentType = fileData.mimeType || "application/octet-stream";
+
+    if (rangeHeader && contentType.startsWith("video/")) {
+      const bytesPrefix = "bytes=";
+      if (!rangeHeader.startsWith(bytesPrefix)) {
+        return res
+          .status(416)
+          .set("Content-Range", `bytes */${fileSize}`)
+          .json({ code: 416, message: "Invalid range header" });
+      }
+
+      const [rangeStart, rangeEnd] = rangeHeader
+        .substring(bytesPrefix.length)
+        .split("-");
+
+      let start = Number.parseInt(rangeStart, 10);
+      let end = rangeEnd ? Number.parseInt(rangeEnd, 10) : fileSize - 1;
+
+      if (
+        Number.isNaN(start) ||
+        Number.isNaN(end) ||
+        start > end ||
+        start < 0 ||
+        end >= fileSize
+      ) {
+        return res
+          .status(416)
+          .set("Content-Range", `bytes */${fileSize}`)
+          .json({ code: 416, message: "Requested range not satisfiable" });
+      }
+
+      const chunkSize = end - start + 1;
+      res.status(206);
+      res.set({
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunkSize,
+        "Content-Type": contentType,
+      });
+
+      const fileStream = fs.createReadStream(filePath, { start, end });
+      fileStream.on("open", () => fileStream.pipe(res));
+      fileStream.on("error", (streamErr) => {
+        console.error("File streaming error:", streamErr);
+        res.destroy(streamErr);
+      });
+      return;
+    }
+
+    res.status(200);
+    res.set({
+      "Content-Length": fileSize,
+      "Content-Type": contentType,
+      "Accept-Ranges": "bytes",
+      "Content-Disposition": `attachment; filename="${fileData.originalName}"`,
+    });
+
+    const fileReadStream = fs.createReadStream(filePath);
+    fileReadStream.on("error", (streamErr) => {
+      console.error("File streaming error:", streamErr);
+      res.destroy(streamErr);
+    });
+    fileReadStream.pipe(res);
+  } catch (error) {
+    console.error("Get file error:", error);
+    return res.status(500).json({
+      code: 500,
+      message: `Internal server error: ${error?.message}`,
+    });
+  }
+};
+
+const deleteFileController = async (req, res) => {
+  try {
+    const fileData = req.fileObject;
+
+    if (!fileData) {
+      return res.status(500).json({
+        code: 500,
+        message: "File context unavailable in request",
+      });
+    }
+
+    const folderPathResp = await buildFolderPath({
+      parentFolderId: fileData.folderId,
+    });
+    if (folderPathResp.code !== 200) {
+      return res.status(folderPathResp.code).json({
+        code: folderPathResp.code,
+        message: `Deleting file failed: ${folderPathResp.message}`,
+      });
+    }
+    const folderPath = folderPathResp.data;
+
+    const fileId = fileData.id;
+    const filePath = path.join(folderPath, fileData.internalName);
+    const thumbnailPath = path.join(
+      folderPath,
+      ".thumbs",
+      fileData.internalName
+    );
+    res.status(200).json({ message: "File deletion initiated" });
+
+    setImmediate(async () => {
+      const backupPath = path.join(
+        config.BACKUP_PATH,
+        `file_${fileId}_backup_${Date.now()}`
+      );
+      try {
+        fs.copyFileSync(filePath, backupPath);
+        console.log(`File backup created at: ${backupPath}`);
+
+        const deleteResult = await prisma.file.delete({
+          where: { id: fileId },
+        });
+        if (!deleteResult) {
+          throw new Error(deleteResult.message);
+        }
+
+        if (fs.existsSync(thumbnailPath)) {
+          fs.unlinkSync(thumbnailPath);
+          console.log(`Thumbnail deleted from filesystem: ${thumbnailPath}`);
+        }
+        fs.unlinkSync(filePath);
+        console.log(`File deleted from database and filesystem: ${fileId}`);
+        fs.unlinkSync(backupPath);
+        console.log(`File deleted from filesystem: ${filePath}`);
+      } catch (error) {
+        console.error(
+          "Background file deletion error - restoring file:",
+          error?.message
+        );
+        try {
+          fs.copyFileSync(backupPath, filePath);
+          console.log(`File restored from backup: ${filePath}`);
+        } catch (restoreError) {
+          console.error(`Restoration failed: ${restoreError?.message}`);
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Delete file error:", error);
+    return res.status(500).json({
+      code: 500,
+      message: `Internal server error: ${error?.message}`,
+    });
+  }
+};
 
 module.exports = {
-  //   uploadController,
-  //   downloadFileController,
+  uploadController,
+  getFileController,
   createFolder,
+  deleteFileController,
   deleteFolder,
 };
