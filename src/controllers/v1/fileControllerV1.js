@@ -8,6 +8,7 @@ const {
   buildFolderPath,
   deleteFolderRecursive,
 } = require("../../utils/commonUtils");
+const { releaseLock } = require("../../config/redisClient");
 
 const createFolder = async (req, res) => {
   try {
@@ -268,6 +269,13 @@ const uploadController = async (req, res) => {
 
     setImmediate(async () => {
       for (const file of files) {
+        // use locks prepared by middleware (if present)
+        const lockEntry = (req.uploadLocks || []).find((l) => l.originalName === file.originalname);
+        if (!lockEntry) {
+          console.log(`Upload skipped for ${file.originalname}: lock not acquired by middleware`);
+          continue;
+        }
+
         const extension = path.extname(file.originalname) || "";
         const normalizedExtension = extension.replace(".", "").toLowerCase();
         const internalName = `${crypto.randomUUID()}${extension}`;
@@ -313,6 +321,10 @@ const uploadController = async (req, res) => {
               .rm(thumbnailDiskPath, { force: true })
               .catch(() => {});
           }
+        } finally {
+          try {
+            await releaseLock(lockEntry.keys, lockEntry.value).catch(() => {});
+          } catch (e) {}
         }
       }
     });
@@ -349,6 +361,7 @@ const getFileController = async (req, res) => {
 
     const folderPath = folderPathResp.data;
     const filePath = path.join(folderPath, fileData.internalName);
+      // Read-lock header is applied by middleware `markReadLockMiddleware`.
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: "File not found on disk" });
@@ -450,7 +463,6 @@ const deleteFileController = async (req, res) => {
       });
     }
     const folderPath = folderPathResp.data;
-
     const fileId = fileData.id;
     const filePath = path.join(folderPath, fileData.internalName);
     const thumbnailPath = path.join(
@@ -461,6 +473,13 @@ const deleteFileController = async (req, res) => {
     res.status(200).json({ message: "File deletion initiated" });
 
     setImmediate(async () => {
+
+        const lockResp = req.deleteLock;
+        if (!lockResp) {
+          console.log(`Delete skipped for file ${fileId}: no lock info in request`);
+          return;
+        }
+
       const backupPath = path.join(
         config.BACKUP_PATH,
         `file_${fileId}_backup_${Date.now()}`
@@ -496,6 +515,9 @@ const deleteFileController = async (req, res) => {
           console.error(`Restoration failed: ${restoreError?.message}`);
         }
       }
+        try {
+          await releaseLock(lockResp.keys, lockResp.value).catch(() => {});
+        } catch (e) {}
     });
   } catch (error) {
     console.error("Delete file error:", error);
