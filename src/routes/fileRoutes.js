@@ -25,11 +25,6 @@ const {
   checkSameFolderInParent,
 } = require("../middleware/checkSameFolderInParent");
 const { checkFileExists } = require("../middleware/checkFileExists");
-const {
-  lockUploadMiddleware,
-  lockDeleteMiddleware,
-  markReadLockMiddleware,
-} = require("../middleware/redisLock");
 
 const upload = multer(); // Files stored in memory
 
@@ -48,7 +43,6 @@ fileRouter.post(
 fileRouter.delete(
   "/deleteFolder",
   validateRequest(folderDeleteSchema),
-  
   deleteFolder
 );
 
@@ -57,7 +51,6 @@ fileRouter.post(
   upload.array("files"),
   validateRequest(fileUploadSchemaV1),
   checkParentExists,
-  lockUploadMiddleware,
   uploadController
 );
 
@@ -65,7 +58,6 @@ fileRouter.get(
   "/getFile",
   validateRequest(fileGetSchemaV1),
   checkFileExists,
-  markReadLockMiddleware,
   getFileController
 );
 
@@ -73,9 +65,7 @@ fileRouter.delete(
   "/deleteFile",
   validateRequest(fileDeleteSchemaV1),
   checkFileExists,
-  lockDeleteMiddleware,
   deleteFileController
 );
 
 module.exports = { fileRouter };
-  
