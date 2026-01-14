@@ -63,14 +63,15 @@ jobs:
       # 2. Export to a local .tar file
       - name: Export to Tar
         run: |
-          docker pull ghcr.io/${{ steps.vars.outputs.repo_owner_lowercase }}/filedabba-backend:${{ steps.vars.outputs.sha_short }}
-          docker save ghcr.io/${{ steps.vars.outputs.repo_owner_lowercase }}/filedabba-backend:${{ steps.vars.outputs.sha_short }} \
-          > filedabba-backend-${{ steps.vars.outputs.sha_short }}.tar
+          docker pull ghcr.io/${{ steps.vars.outputs.repo_owner_lowercase }}/filedabba-backend:latest
+          docker save ghcr.io/${{ steps.vars.outputs.repo_owner_lowercase }}/filedabba-backend:latest \
+            ghcr.io/${{ steps.vars.outputs.repo_owner_lowercase }}/filedabba-backend:${{ steps.vars.outputs.sha_short }} \
+            > filedabba-backend.tar
 
       - name: Echo - Export Complete
         run: |
           echo "✓ Docker image exported to tar file"
-          echo "  File: filedabba-backend-${{ steps.vars.outputs.sha_short }}.tar"
+          echo "  File: filedabba-backend.tar"
 
       # 3. Create the GitHub Release with the .tar attached
       - name: Create Release
@@ -79,7 +80,7 @@ jobs:
           # Use the commit SHA as the tag name for the release
           tag_name: release-${{ steps.vars.outputs.sha_short }}
           name: Manual Release ${{ steps.vars.outputs.sha_short }}
-          files: filedabba-backend-${{ steps.vars.outputs.sha_short }}.tar
+          files: filedabba-backend.tar
           body: |
             ## Manual Deployment Info
             - **Registry Image:** `ghcr.io/${{ steps.vars.outputs.repo_owner_lowercase }}/filedabba-backend:${{ steps.vars.outputs.sha_short }}`
