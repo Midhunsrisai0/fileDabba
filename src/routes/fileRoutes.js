@@ -19,7 +19,7 @@ const { prisma } = require("../../prisma/prisma");
 const {
   folderCreateSchema,
   folderDeleteSchema,
-} = require("../validations/foldervalidationsV1");
+} = require("../validations/folderValidationsV1");
 const { checkParentExists } = require("../middleware/checkParentExists");
 const {
   checkSameFolderInParent,
@@ -48,7 +48,7 @@ fileRouter.post(
 fileRouter.delete(
   "/deleteFolder",
   validateRequest(folderDeleteSchema),
-  
+
   deleteFolder
 );
 
@@ -78,4 +78,3 @@ fileRouter.delete(
 );
 
 module.exports = { fileRouter };
-  

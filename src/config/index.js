@@ -3,8 +3,8 @@ dotenv.config();
 
 const config = {
   version: "2.0.0",
-  PORT: process.env.PORT || 3000,
-  HOST: process.env.HOST || "localhost",
+  PORT: process.env.PORT || 1729,
+  HOST: process.env.HOST || "0.0.0.0",
   BASE_FILE_PATH: process.env.BASE_FILE_PATH,
   BASE_FOLDER_ID: process.env.BASE_FOLDER_ID,
   BACKUP_PATH: process.env.BACKUP_PATH || "./backups",
