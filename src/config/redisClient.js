@@ -1,9 +1,20 @@
-const Redis = require('ioredis');
-const crypto = require('crypto');
+const Redis = require("ioredis");
+const crypto = require("crypto");
 
-const redis = new Redis(process.env.REDIS_URL || {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
+const redis = new Redis(
+  process.env.REDIS_URL || {
+    host: process.env.REDIS_HOST || "127.0.0.1",
+    port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
+    password: process.env.REDIS_PASSWORD || null,
+  }
+);
+
+redis.on("ready", () => {
+  console.log("Connected to Redis successfully");
+});
+
+redis.on("error", (err) => {
+  console.log("Failed to connect to Redis:", err.message);
 });
 
 // Lua script provided by the user — handles file/folder intent/read/write atomically
@@ -54,8 +65,15 @@ return 0
 async function acquireLock(keys, op, ttl = 30000) {
   const value = crypto.randomUUID();
   try {
-    const resp = await redis.eval(LOCK_LUA, keys.length, ...keys, op, value, String(ttl));
-    console.log('acquireLock', { keys, op, resp });
+    const resp = await redis.eval(
+      LOCK_LUA,
+      keys.length,
+      ...keys,
+      op,
+      value,
+      String(ttl)
+    );
+    console.log("acquireLock", { keys, op, resp });
     return resp === 1 ? { success: true, value } : { success: false };
   } catch (err) {
     return { success: false };
@@ -64,7 +82,8 @@ async function acquireLock(keys, op, ttl = 30000) {
 
 async function releaseLock(keys, value) {
   // Accept either a single key or array of keys — attempt to delete any matching entries
-  const RELEASE_SCRIPT = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
+  const RELEASE_SCRIPT =
+    'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
   try {
     const keyList = Array.isArray(keys) ? keys : [keys];
     for (const k of keyList) {

@@ -13,7 +13,7 @@ const { healthCheckRouter } = require("./routes/healthCheckRoutes");
 const config = require("./config");
 
 app.use("/health-check", healthCheckRouter);
-
+app.use("/ping", (req, res) => res.send("pong"));
 app.use("/files/v1", fileRouter);
 
 app.listen(config.PORT, config.HOST, () => {
