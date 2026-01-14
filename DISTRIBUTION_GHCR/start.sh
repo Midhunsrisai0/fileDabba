@@ -1,4 +1,3 @@
 #!/bin/bash
 
-docker compose pull
-docker compose up -d
+docker compose down && docker system prune -a -f && docker builder prune -a -f && docker compose up -d

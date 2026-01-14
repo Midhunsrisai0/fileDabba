@@ -14,6 +14,11 @@ services:
     depends_on:
       - postgres
       - redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m" # Max size of one log file
+        max-file: "3" # Keep only 3 old files before deleting
 
   postgres:
     image: postgres:16
