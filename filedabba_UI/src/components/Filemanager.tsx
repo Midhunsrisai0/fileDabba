@@ -185,6 +185,7 @@ export default function FileManagerScreen() {
   );
 }
 
+
 /* ---------- STYLES ---------- */
 const styles = StyleSheet.create({
   container: {
